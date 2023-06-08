@@ -5,6 +5,7 @@
 #include <random>
 #include <thread>
 #include <chrono>
+#include <algorithm>
 
 // Функція для заповнення масиву випадковими числами
 void fillArrayWithRandomNumbers(std::vector<int>& arr, int min, int max)
@@ -64,18 +65,15 @@ void merge(std::vector<int>& arr, int left, int middle, int right)
         k++;
     }
 }
-
 // Послідовний алгоритм сортування "Merge Sort"
 void mergeSortSequential(std::vector<int>& arr, int left, int right)
 {
     if (left < right) {
         int middle = left + (right - left) / 2;
 
-        // Рекурсивно сортуємо першу та другу половину масиву
         mergeSortSequential(arr, left, middle);
         mergeSortSequential(arr, middle + 1, right);
 
-        // Злиття відсортованих підмасивів
         merge(arr, left, middle, right);
     }
 }
@@ -83,25 +81,23 @@ void mergeSortSequential(std::vector<int>& arr, int left, int right)
 // Паралельний алгоритм сортування "Merge Sort"
 void mergeSortParallel(std::vector<int>& arr, int left, int right, int numThreads)
 {
-    if (numThreads <= 1 || right - left < 1000) {
-        mergeSortSequential(arr, left, right);
-        return;
+    if (left < right) {
+        if (numThreads <= 1) {
+            mergeSortSequential(arr, left, right);
+        }
+        else {
+            int middle = left + (right - left) / 2;
+
+            std::thread leftThread(mergeSortParallel, std::ref(arr), left, middle, numThreads / 2);
+            std::thread rightThread(mergeSortParallel, std::ref(arr), middle + 1, right, numThreads / 2);
+
+            leftThread.join();
+            rightThread.join();
+
+            merge(arr, left, middle, right);
+        }
     }
-
-    int middle = left + (right - left) / 2;
-
-    // Створення потоків для рекурсивного сортування підмасивів
-    std::thread leftThread(mergeSortParallel, std::ref(arr), left, middle, numThreads / 2);
-    std::thread rightThread(mergeSortParallel, std::ref(arr), middle + 1, right, numThreads / 2);
-
-    // Очікування завершення обох потоків
-    leftThread.join();
-    rightThread.join();
-
-    // Злиття відсортованих підмасивів
-    merge(arr, left, middle, right);
 }
-
 int main()
 {
     // Кількість випадкових чисел, яку введе користувач
@@ -122,31 +118,47 @@ int main()
     std::vector<int> arr(numRandomNumbers);
     fillArrayWithRandomNumbers(arr, 1, 100000000);
 
+    // Копія масиву для мультипотокового сортування
+    std::vector<int> arrParallel = arr;
+
     int numThreads = std::thread::hardware_concurrency();
 
     // Засіб для вимірювання часу виконання
     std::chrono::steady_clock::time_point start, end;
-    std::chrono::duration<double> duration;
+    std::chrono::duration<double> durationSeq, durationPar;
 
-    // Виконання паралельного сортування з вимірюванням часу
+    // Послідовне сортування
     start = std::chrono::steady_clock::now();
-    mergeSortParallel(arr, 0, arr.size() - 1, numThreads);
+    mergeSortSequential(arr, 0, arr.size() - 1);
     end = std::chrono::steady_clock::now();
-    duration = end - start;
+    durationSeq = end - start;
 
-    // Виведення відсортованого масиву та часу виконання
-    std::cout << "Sorted array: ";
-    for (int i = 0; i < std::min(static_cast<int>(arr.size()), 1000); ++i) {//При виведенні більшої кількості за 1000000 займає дуже багато часу при роботі програми в секунди
-        std::cout << arr[i] << " ";
-    }
-    std::cout << std::endl;
+    // Паралельне сортування з використанням всіх доступних потоків
+    start = std::chrono::steady_clock::now();
+    mergeSortParallel(arrParallel, 0, arrParallel.size() - 1, numThreads);
+    end = std::chrono::steady_clock::now();
+    durationPar = end - start;
 
-    std::cout << "Execution time: " << duration.count() << " seconds" << std::endl;
+    // Паралельне сортування з використанням одного потоку
+    std::vector<int> arrSingleThread = arr;
+    start = std::chrono::steady_clock::now();
+    mergeSortParallel(arrSingleThread, 0, arrSingleThread.size() - 1, 1);
+    end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> durationSingleThread = end - start;
+
+    // Виведення результатів
+    std::cout << "Sequential Sort Time: " << durationSeq.count() << " seconds" << std::endl;
+    std::cout << "Parallel Sort Time (" << numThreads << " threads): " << durationPar.count() << " seconds" << std::endl;
+    std::cout << "Parallel Sort Time (1 thread): " << durationSingleThread.count() << " seconds" << std::endl;
+
+    double speedupPar = durationSeq / durationPar;
+    double speedupSingleThread = durationSeq / durationSingleThread;
+
+    std::cout << "Speedup (Parallel, " << numThreads << " threads): " << speedupPar << "x faster" << std::endl;
+    std::cout << "Speedup (Parallel, 1 thread): " << speedupSingleThread << "x faster" << std::endl;
 
     return 0;
 }
-
-
 // Запуск программы: CTRL+F5 или меню "Отладка" > "Запуск без отладки"
 // Отладка программы: F5 или меню "Отладка" > "Запустить отладку"
 
