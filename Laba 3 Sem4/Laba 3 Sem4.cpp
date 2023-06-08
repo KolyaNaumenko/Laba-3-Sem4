@@ -1,9 +1,22 @@
 ﻿// Laba 3 Sem4.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
 //
-
 #include <iostream>
 #include <vector>
+#include <random>
 #include <thread>
+#include <chrono>
+
+// Функція для заповнення масиву випадковими числами
+void fillArrayWithRandomNumbers(std::vector<int>& arr, int min, int max)
+{
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dis(min, max);
+
+    for (int& num : arr) {
+        num = dis(gen);
+    }
+}
 
 // Функція для злиття двох підмасивів у відсортований масив
 void merge(std::vector<int>& arr, int left, int middle, int right)
@@ -91,20 +104,44 @@ void mergeSortParallel(std::vector<int>& arr, int left, int right, int numThread
 
 int main()
 {
-    // Вхідний масив
-    std::vector<int> arr = { 9, 3, 2, 7, 1, 5, 6, 4, 8 };
+    // Кількість випадкових чисел, яку введе користувач
+    int numRandomNumbers;
 
-    int numThreads = std::thread::hardware_concurrency(); // Отримання кількості доступних потоків
+    std::ios_base::sync_with_stdio(false); // Вимкнення синхронізації ввідно-вивідних потоків
 
-    // Паралельне сортування масиву
+    std::cout << "Enter the number of random numbers: ";
+    std::cin >> numRandomNumbers;
+
+    // Перевірка на недопустимі значення
+    if (numRandomNumbers <= 0) {
+        std::cout << "Invalid number of random numbers." << std::endl;
+        return 1;
+    }
+
+    // Вхідні дані
+    std::vector<int> arr(numRandomNumbers);
+    fillArrayWithRandomNumbers(arr, 1, 100000000);
+
+    int numThreads = std::thread::hardware_concurrency();
+
+    // Засіб для вимірювання часу виконання
+    std::chrono::steady_clock::time_point start, end;
+    std::chrono::duration<double> duration;
+
+    // Виконання паралельного сортування з вимірюванням часу
+    start = std::chrono::steady_clock::now();
     mergeSortParallel(arr, 0, arr.size() - 1, numThreads);
+    end = std::chrono::steady_clock::now();
+    duration = end - start;
 
-    // Виведення відсортованого масиву
+    // Виведення відсортованого масиву та часу виконання
     std::cout << "Sorted array: ";
-    for (int num : arr) {
-        std::cout << num << " ";
+    for (int i = 0; i < std::min(static_cast<int>(arr.size()), 1000); ++i) {//При виведенні більшої кількості за 1000000 займає дуже багато часу при роботі програми в секунди
+        std::cout << arr[i] << " ";
     }
     std::cout << std::endl;
+
+    std::cout << "Execution time: " << duration.count() << " seconds" << std::endl;
 
     return 0;
 }
