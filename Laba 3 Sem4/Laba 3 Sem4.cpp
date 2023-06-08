@@ -6,6 +6,7 @@
 #include <thread>
 #include <chrono>
 #include <algorithm>
+#include <cassert>
 
 // Функція для заповнення масиву випадковими числами
 void fillArrayWithRandomNumbers(std::vector<int>& arr, int min, int max)
@@ -51,20 +52,18 @@ void merge(std::vector<int>& arr, int left, int middle, int right)
         k++;
     }
 
-    // Копіювання залишків елементів L, якщо такі є
     while (i < n1) {
         arr[k] = L[i];
         i++;
         k++;
     }
-
-    // Копіювання залишків елементів R, якщо такі є
     while (j < n2) {
         arr[k] = R[j];
         j++;
         k++;
     }
 }
+
 // Послідовний алгоритм сортування "Merge Sort"
 void mergeSortSequential(std::vector<int>& arr, int left, int right)
 {
@@ -98,8 +97,40 @@ void mergeSortParallel(std::vector<int>& arr, int left, int right, int numThread
         }
     }
 }
+
+// Юніт-тести
+
+void testMergeSort()
+{
+    std::vector<int> arr = { 4, 2, 7, 5, 1, 3, 6 };
+    std::vector<int> sortedArr = { 1, 2, 3, 4, 5, 6, 7 };
+
+    mergeSortSequential(arr, 0, arr.size() - 1);
+    assert(arr == sortedArr);
+
+    arr = { 4, 2, 7, 5, 1, 3, 6 };
+    mergeSortParallel(arr, 0, arr.size() - 1, 2);
+    assert(arr == sortedArr);
+}
+
+void testMergeSortEmptyArray()
+{
+    std::vector<int> arr;
+    std::vector<int> sortedArr;
+
+    mergeSortSequential(arr, 0, arr.size() - 1);
+    assert(arr == sortedArr);
+
+    mergeSortParallel(arr, 0, arr.size() - 1, 2);
+    assert(arr == sortedArr);
+}
+
 int main()
 {
+    // Юніт-тести
+    testMergeSort();
+    testMergeSortEmptyArray();
+
     // Кількість випадкових чисел, яку введе користувач
     int numRandomNumbers;
 
@@ -159,13 +190,3 @@ int main()
 
     return 0;
 }
-// Запуск программы: CTRL+F5 или меню "Отладка" > "Запуск без отладки"
-// Отладка программы: F5 или меню "Отладка" > "Запустить отладку"
-
-// Советы по началу работы 
-//   1. В окне обозревателя решений можно добавлять файлы и управлять ими.
-//   2. В окне Team Explorer можно подключиться к системе управления версиями.
-//   3. В окне "Выходные данные" можно просматривать выходные данные сборки и другие сообщения.
-//   4. В окне "Список ошибок" можно просматривать ошибки.
-//   5. Последовательно выберите пункты меню "Проект" > "Добавить новый элемент", чтобы создать файлы кода, или "Проект" > "Добавить существующий элемент", чтобы добавить в проект существующие файлы кода.
-//   6. Чтобы снова открыть этот проект позже, выберите пункты меню "Файл" > "Открыть" > "Проект" и выберите SLN-файл.
