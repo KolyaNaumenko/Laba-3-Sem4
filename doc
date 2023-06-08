@@ -1,0 +1,62 @@
+/**
+ * @file main.cpp
+ * @brief Implementation of the Merge Sort algorithm with sequential and parallel versions.
+ */
+
+#include <iostream>
+#include <vector>
+#include <random>
+#include <thread>
+#include <chrono>
+#include <algorithm>
+#include <cassert>
+
+/**
+ * @brief Fills the array with random numbers within the given range.
+ * @param arr The array to be filled with random numbers.
+ * @param min The minimum value of the random numbers.
+ * @param max The maximum value of the random numbers.
+ */
+void fillArrayWithRandomNumbers(std::vector<int>& arr, int min, int max);
+
+/**
+ * @brief Merges two subarrays into a sorted array.
+ * @param arr The array to be sorted.
+ * @param left The starting index of the first subarray.
+ * @param middle The ending index of the first subarray.
+ * @param right The ending index of the second subarray.
+ */
+void merge(std::vector<int>& arr, int left, int middle, int right);
+
+/**
+ * @brief Sequential merge sort algorithm.
+ * @param arr The array to be sorted.
+ * @param left The starting index of the subarray.
+ * @param right The ending index of the subarray.
+ */
+void mergeSortSequential(std::vector<int>& arr, int left, int right);
+
+/**
+ * @brief Parallel merge sort algorithm.
+ * @param arr The array to be sorted.
+ * @param left The starting index of the subarray.
+ * @param right The ending index of the subarray.
+ * @param numThreads The number of threads to use for sorting.
+ */
+void mergeSortParallel(std::vector<int>& arr, int left, int right, int numThreads);
+
+/**
+ * @brief Unit test for the merge sort algorithm.
+ */
+void testMergeSort();
+
+/**
+ * @brief Unit test for the merge sort algorithm with an empty array.
+ */
+void testMergeSortEmptyArray();
+
+/**
+ * @brief Entry point of the program.
+ * @return The exit status of the program.
+ */
+int main();
