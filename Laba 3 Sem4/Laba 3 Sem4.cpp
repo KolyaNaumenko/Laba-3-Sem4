@@ -2,191 +2,304 @@
 //
 #include <iostream>
 #include <vector>
-#include <random>
-#include <thread>
-#include <chrono>
 #include <algorithm>
+#include <random>
+#include <chrono>
 #include <cassert>
+#include <thread>
 
-// Функція для заповнення масиву випадковими числами
+// Функція для генерації випадкових чисел у заданому діапазоні
 void fillArrayWithRandomNumbers(std::vector<int>& arr, int min, int max)
 {
     std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dis(min, max);
+    std::mt19937 rng(rd());
+    std::uniform_int_distribution<int> uni(min, max);
 
     for (int& num : arr) {
-        num = dis(gen);
+        num = uni(rng);
     }
 }
 
-// Функція для злиття двох підмасивів у відсортований масив
-void merge(std::vector<int>& arr, int left, int middle, int right)
+// Функція для обміну значень двох елементів масиву
+void swap(int& a, int& b)
 {
-    int i, j, k;
-    int n1 = middle - left + 1;
-    int n2 = right - middle;
+    int temp = a;
+    a = b;
+    b = temp;
+}
 
-    // Створення тимчасових підмасивів
-    std::vector<int> L(n1), R(n2);
+// Функція для розділення масиву у Quicksort
+int partition(std::vector<int>& arr, int low, int high)
+{
+    int pivot = arr[high];
+    int i = low - 1;
 
-    // Копіювання даних в тимчасові підмасиви L та R
-    for (i = 0; i < n1; i++)
-        L[i] = arr[left + i];
-    for (j = 0; j < n2; j++)
-        R[j] = arr[middle + 1 + j];
-
-    // Злиття тимчасових підмасивів назад у відсортований масив
-    i = 0;
-    j = 0;
-    k = left;
-    while (i < n1 && j < n2) {
-        if (L[i] <= R[j]) {
-            arr[k] = L[i];
+    for (int j = low; j <= high - 1; j++) {
+        if (arr[j] < pivot) {
             i++;
+            swap(arr[i], arr[j]);
+        }
+    }
+
+    swap(arr[i + 1], arr[high]);
+    return i + 1;
+}
+
+// Послідовне сортування Quicksort
+void quickSortSequential(std::vector<int>& arr, int low, int high)
+{
+    if (low < high) {
+        int pi = partition(arr, low, high);
+
+        quickSortSequential(arr, low, pi - 1);
+        quickSortSequential(arr, pi + 1, high);
+    }
+}
+
+// Паралельне сортування Quicksort з використанням паралельних регіонів OpenMP
+void quickSortParallel(std::vector<int>& arr, int low, int high, int numThreads)
+{
+    if (low < high) {
+        int pi = partition(arr, low, high);
+
+        if (numThreads > 1) {
+            if (numThreads >= 2) {
+#pragma omp parallel sections
+                {
+#pragma omp section
+                    quickSortParallel(arr, low, pi - 1, numThreads / 2);
+#pragma omp section
+                    quickSortParallel(arr, pi + 1, high, numThreads - numThreads / 2);
+                }
+            }
+            else {
+                quickSortParallel(arr, low, pi - 1, 1);
+                quickSortParallel(arr, pi + 1, high, 1);
+            }
         }
         else {
-            arr[k] = R[j];
+            quickSortSequential(arr, low, pi - 1);
+            quickSortSequential(arr, pi + 1, high);
+        }
+    }
+}
+
+// Послідовне сортування Merge Sort
+void mergeSortSequential(std::vector<int>& arr, int low, int high)
+{
+    if (low < high) {
+        int mid = low + (high - low) / 2;
+
+        mergeSortSequential(arr, low, mid);
+        mergeSortSequential(arr, mid + 1, high);
+
+        std::vector<int> mergedArr(high - low + 1);
+
+        int i = low;
+        int j = mid + 1;
+        int k = 0;
+
+        while (i <= mid && j <= high) {
+            if (arr[i] <= arr[j]) {
+                mergedArr[k] = arr[i];
+                i++;
+            }
+            else {
+                mergedArr[k] = arr[j];
+                j++;
+            }
+            k++;
+        }
+
+        while (i <= mid) {
+            mergedArr[k] = arr[i];
+            i++;
+            k++;
+        }
+
+        while (j <= high) {
+            mergedArr[k] = arr[j];
             j++;
+            k++;
         }
-        k++;
-    }
 
-    while (i < n1) {
-        arr[k] = L[i];
-        i++;
-        k++;
-    }
-    while (j < n2) {
-        arr[k] = R[j];
-        j++;
-        k++;
+        for (int m = 0; m < k; m++) {
+            arr[low + m] = mergedArr[m];
+        }
     }
 }
 
-// Послідовний алгоритм сортування "Merge Sort"
-void mergeSortSequential(std::vector<int>& arr, int left, int right)
+// Паралельне сортування Merge Sort з використанням паралельних регіонів OpenMP
+void mergeSortParallel(std::vector<int>& arr, int low, int high, int numThreads)
 {
-    if (left < right) {
-        int middle = left + (right - left) / 2;
+    if (low < high) {
+        if (numThreads > 1) {
+            int mid = low + (high - low) / 2;
 
-        mergeSortSequential(arr, left, middle);
-        mergeSortSequential(arr, middle + 1, right);
+#pragma omp parallel sections
+            {
+#pragma omp section
+                mergeSortParallel(arr, low, mid, numThreads / 2);
+#pragma omp section
+                mergeSortParallel(arr, mid + 1, high, numThreads - numThreads / 2);
+            }
 
-        merge(arr, left, middle, right);
-    }
-}
+            std::vector<int> mergedArr(high - low + 1);
 
-// Паралельний алгоритм сортування "Merge Sort"
-void mergeSortParallel(std::vector<int>& arr, int left, int right, int numThreads)
-{
-    if (left < right) {
-        if (numThreads <= 1) {
-            mergeSortSequential(arr, left, right);
+            int i = low;
+            int j = mid + 1;
+            int k = 0;
+
+            while (i <= mid && j <= high) {
+                if (arr[i] <= arr[j]) {
+                    mergedArr[k] = arr[i];
+                    i++;
+                }
+                else {
+                    mergedArr[k] = arr[j];
+                    j++;
+                }
+                k++;
+            }
+
+            while (i <= mid) {
+                mergedArr[k] = arr[i];
+                i++;
+                k++;
+            }
+
+            while (j <= high) {
+                mergedArr[k] = arr[j];
+                j++;
+                k++;
+            }
+
+            for (int m = 0; m < k; m++) {
+                arr[low + m] = mergedArr[m];
+            }
         }
         else {
-            int middle = left + (right - left) / 2;
-
-            std::thread leftThread(mergeSortParallel, std::ref(arr), left, middle, numThreads / 2);
-            std::thread rightThread(mergeSortParallel, std::ref(arr), middle + 1, right, numThreads / 2);
-
-            leftThread.join();
-            rightThread.join();
-
-            merge(arr, left, middle, right);
+            mergeSortSequential(arr, low, high);
         }
     }
 }
 
-// Юніт-тести
-
-void testMergeSort()
+// Послідовне сортування Heap Sort
+void heapify(std::vector<int>& arr, int n, int i)
 {
-    std::vector<int> arr = { 4, 2, 7, 5, 1, 3, 6 };
-    std::vector<int> sortedArr = { 1, 2, 3, 4, 5, 6, 7 };
+    int largest = i;
+    int left = 2 * i + 1;
+    int right = 2 * i + 2;
 
-    mergeSortSequential(arr, 0, arr.size() - 1);
-    assert(arr == sortedArr);
+    if (left < n && arr[left] > arr[largest]) {
+        largest = left;
+    }
 
-    arr = { 4, 2, 7, 5, 1, 3, 6 };
-    mergeSortParallel(arr, 0, arr.size() - 1, 2);
-    assert(arr == sortedArr);
+    if (right < n && arr[right] > arr[largest]) {
+        largest = right;
+    }
+
+    if (largest != i) {
+        swap(arr[i], arr[largest]);
+#pragma omp parallel
+        {
+#pragma omp single nowait
+            heapify(arr, n, largest);
+        }
+    }
+}
+void heapSortSequential(std::vector<int>& arr)
+{
+    int n = arr.size();
+
+    for (int i = n / 2 - 1; i >= 0; --i) {
+        heapify(arr, n, i);
+    }
+
+    for (int i = n - 1; i > 0; --i) {
+        std::swap(arr[0], arr[i]);
+
+        heapify(arr, i, 0);
+    }
 }
 
-void testMergeSortEmptyArray()
+// Паралельне сортування Heap Sort з використанням паралельних регіонів OpenMP
+void heapSortParallel(std::vector<int>& arr, int numThreads)
 {
-    std::vector<int> arr;
-    std::vector<int> sortedArr;
+    int n = arr.size();
 
-    mergeSortSequential(arr, 0, arr.size() - 1);
-    assert(arr == sortedArr);
-
-    mergeSortParallel(arr, 0, arr.size() - 1, 2);
-    assert(arr == sortedArr);
+#pragma omp parallel num_threads(numThreads)
+    {
+#pragma omp single
+        {
+            // Побудова купи (heapify)
+            for (int i = n / 2 - 1; i >= 0; i--) {
+#pragma omp task
+                heapify(arr, n, i);
+            }
+        }
+    }
 }
 
 int main()
 {
-    // Юніт-тести
-    testMergeSort();
-    testMergeSortEmptyArray();
+    int size;
+    std::cout << "Enter the number of random numbers to generate and sort: ";
+    std::cin >> size;
 
-    // Кількість випадкових чисел, яку введе користувач
-    int numRandomNumbers;
+    std::vector<int> arr(size);
+    fillArrayWithRandomNumbers(arr, 1, size);
 
-    std::ios_base::sync_with_stdio(false); // Вимкнення синхронізації ввідно-вивідних потоків
+    std::vector<int> arr1 = arr;
+    std::vector<int> arr2 = arr;
+    std::vector<int> arr3 = arr;
 
-    std::cout << "Enter the number of random numbers: ";
-    std::cin >> numRandomNumbers;
+    std::cout << "Sorting " << size << " numbers sequentially:\n";
 
-    // Перевірка на недопустимі значення
-    if (numRandomNumbers <= 0) {
-        std::cout << "Invalid number of random numbers." << std::endl;
-        return 1;
-    }
+    auto start = std::chrono::high_resolution_clock::now();
+    quickSortSequential(arr1, 0, size - 1);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end - start;
+    std::cout << "Quicksort: " << duration.count() << " seconds\n";
 
-    // Вхідні дані
-    std::vector<int> arr(numRandomNumbers);
-    fillArrayWithRandomNumbers(arr, 1, 100000000);
+    start = std::chrono::high_resolution_clock::now();
+    mergeSortSequential(arr2, 0, size - 1);
+    end = std::chrono::high_resolution_clock::now();
+    duration = end - start;
+    std::cout << "Merge Sort: " << duration.count() << " seconds\n";
 
-    // Копія масиву для мультипотокового сортування
-    std::vector<int> arrParallel = arr;
+    start = std::chrono::high_resolution_clock::now();
+    heapSortSequential(arr3);
+    end = std::chrono::high_resolution_clock::now();
+    duration = end - start;
+    std::cout << "Heap Sort: " << duration.count() << " seconds\n";
+
+    std::cout << "\nSorting " << size << " numbers in parallel:\n";
 
     int numThreads = std::thread::hardware_concurrency();
 
-    // Засіб для вимірювання часу виконання
-    std::chrono::steady_clock::time_point start, end;
-    std::chrono::duration<double> durationSeq, durationPar;
+    arr1 = arr;
+    arr2 = arr;
+    arr3 = arr;
 
-    // Послідовне сортування
-    start = std::chrono::steady_clock::now();
-    mergeSortSequential(arr, 0, arr.size() - 1);
-    end = std::chrono::steady_clock::now();
-    durationSeq = end - start;
+    start = std::chrono::high_resolution_clock::now();
+    quickSortParallel(arr1, 0, size - 1, numThreads);
+    end = std::chrono::high_resolution_clock::now();
+    duration = end - start;
+    std::cout << "Quicksort: " << duration.count() << " seconds\n";
 
-    // Паралельне сортування з використанням всіх доступних потоків
-    start = std::chrono::steady_clock::now();
-    mergeSortParallel(arrParallel, 0, arrParallel.size() - 1, numThreads);
-    end = std::chrono::steady_clock::now();
-    durationPar = end - start;
+    start = std::chrono::high_resolution_clock::now();
+    mergeSortParallel(arr2, 0, size - 1, numThreads);
+    end = std::chrono::high_resolution_clock::now();
+    duration = end - start;
+    std::cout << "Merge Sort: " << duration.count() << " seconds\n";
 
-    // Паралельне сортування з використанням одного потоку
-    std::vector<int> arrSingleThread = arr;
-    start = std::chrono::steady_clock::now();
-    mergeSortParallel(arrSingleThread, 0, arrSingleThread.size() - 1, 1);
-    end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> durationSingleThread = end - start;
-
-    // Виведення результатів
-    std::cout << "Sequential Sort Time: " << durationSeq.count() << " seconds" << std::endl;
-    std::cout << "Parallel Sort Time (" << numThreads << " threads): " << durationPar.count() << " seconds" << std::endl;
-    std::cout << "Parallel Sort Time (1 thread): " << durationSingleThread.count() << " seconds" << std::endl;
-
-    double speedupPar = durationSeq / durationPar;
-    double speedupSingleThread = durationSeq / durationSingleThread;
-
-    std::cout << "Speedup (Parallel, " << numThreads << " threads): " << speedupPar << "x faster" << std::endl;
-    std::cout << "Speedup (Parallel, 1 thread): " << speedupSingleThread << "x faster" << std::endl;
+    start = std::chrono::high_resolution_clock::now();
+    heapSortParallel(arr3, numThreads);
+    end = std::chrono::high_resolution_clock::now();
+    duration = end - start;
+    std::cout << "Heap Sort: " << duration.count() << " seconds\n";
 
     return 0;
 }
+
